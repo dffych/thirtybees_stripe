@@ -112,7 +112,7 @@ class Stripe extends PaymentModule
      */
     public function __construct()
     {
-        $this->name = 'stripe_cybor';
+        $this->name = 'stripe';
         $this->tab = 'payments_gateways';
         $this->version = '3.9.4';
         $this->author = 'Cybor SA';
