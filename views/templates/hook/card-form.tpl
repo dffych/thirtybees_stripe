@@ -1,46 +1,52 @@
 <style>
     .thirtybees.thirtybees-stripe {
         background-color: transparent;
+		margin-bottom: 15px;
+	
+		
     }
 
     .thirtybees.thirtybees-stripe * {
-        font-family: {if !empty($stripe_checkout_font_family)}{$stripe_checkout_font_family|escape:'htmlall'}, {/if} Inter UI, Open Sans, Segoe UI, sans-serif;
+        font-family: Arial;
         font-size: {if !empty($stripe_checkout_font_size)}{$stripe_checkout_font_size|escape:'htmlall'}{else}15px{/if};
         font-weight: 500;
     }
 
     .thirtybees.thirtybees-stripe form {
+		min-width: 100%;
         max-width: 496px !important;
         padding: 0px;
+		border: 1px solid #d6d4d4;
     }
 
     .thirtybees.thirtybees-stripe form > * + * {
-        margin-top: 10px;
-        margin-bottom: 10px;
+ 
     }
 
     .thirtybees.thirtybees-stripe .tb-container {
         background-color: #fff;
-        box-shadow: 0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08);
-        border-radius: 4px;
+        /*box-shadow: 0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08);*/
+        border-radius: 0px;
         padding: 3px;
     }
 
     .thirtybees.thirtybees-stripe fieldset {
         border-style: none;
         padding: 5px;
-        margin-left: -5px;
-        margin-right: -5px;
-        background: rgba(18, 91, 152, 0.05);
-        border-radius: 8px;
+        margin-left: 0px;
+        margin-right: 0px;
+        /*background: rgba(18, 91, 152, 0.05);*/
+        border-radius: 0px;
     }
 
     .thirtybees.thirtybees-stripe fieldset legend {
         float: left;
         width: 100%;
-        text-align: center;
+        text-align: left;
         font-size: 16px;
-        color: #8898aa;
+		font-weight: 700;
+        color: black;
+		letter-spacing: -1px;
         padding: 3px 10px 7px;
     }
 
@@ -72,7 +78,9 @@
 
     .thirtybees.thirtybees-stripe #thirtybees-stripe-card {
         padding: 10px;
-        margin-bottom: 2px;
+        margin-bottom: 12px;
+		background: rgba(18, 91, 152, 0.05);
+		
     }
 
     .thirtybees.thirtybees-stripe input {
@@ -144,7 +152,7 @@
 		-moz-osx-font-smoothing: grayscale;
 	}
 	
-	.thirtybees.thirtybees-stripe .payments { text-align:center; padding-bottom:4px;}
+	.thirtybees.thirtybees-stripe .payments { text-align:left; padding-left:5px; padding-bottom:4px;}
 </style>
 
 <div id="tb-stripe-elements">
