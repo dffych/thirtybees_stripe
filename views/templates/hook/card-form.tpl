@@ -39,7 +39,7 @@
         float: left;
         width: 100%;
         text-align: center;
-        font-size: 13px;
+        font-size: 16px;
         color: #8898aa;
         padding: 3px 10px 7px;
     }
@@ -131,6 +131,20 @@
     .thirtybees.thirtybees-stripe #error-text .message {
         padding-left: 15px;
     }
+	
+	.thirtybees.thirtybees-stripe .pf {
+		display: inline-block;
+		font: normal normal normal 14px / 1 PaymentFont;
+		font-size: inherit;
+		font-size: 2em;
+		vertical-align:middle;
+		margin:3px;
+		text-rendering: auto;
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+	}
+	
+	.thirtybees.thirtybees-stripe .payments { text-align:center; padding-bottom:4px;}
 </style>
 
 <div id="tb-stripe-elements">
@@ -146,6 +160,7 @@
                 <legend class="payment-request-available" data-tid="elements_thirtybees.form.enter_card_manually">
                     {l s='Or enter card details' mod='stripe'}
                 </legend>
+				<div class="payments"><i class="pf pf-visa"></i><i class="pf pf-mastercard-alt"></i> via <i class="pf pf-stripe"></i></div>
                 <div class="tb-container">
                     <div id="thirtybees-stripe-card"></div>
                     <button type="submit" id="stripe-submit-button"
@@ -299,7 +314,16 @@
                 style: style
             });
 
-            // Add an instance of the card Element into the `card-element` <div>
+	    card.on('change', function(event) {
+  		console.log(event);
+		if (event.complete) {
+ 		   // enable payment button
+ 		 } else if (event.error) {
+ 		   // show validation to customer
+ 		 }
+}		);
+
+            // Add an instance of the ard Element into the `card-element` <div>
             card.mount('#thirtybees-stripe-card');
 
             {if !empty($stripe_payment_request) && $stripe_payment_request}
@@ -312,7 +336,8 @@
                 total: {
                     amount: {$stripe_amount|escape:'javascript'},
                     label: 'Total'
-                }
+                },
+				requestPayerName: true
             });
 
             paymentRequest.on('paymentmethod', function(ev) {
@@ -375,7 +400,6 @@
 
                 // Disable all inputs.
                 disableInputs();
-
                 stripe
                     .handleCardPayment('{$stripe_client_secret|escape:'javascript'}', card)
                     .then(function (data) {
