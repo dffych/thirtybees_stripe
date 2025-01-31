@@ -267,6 +267,8 @@
 
             var example = document.querySelector('.thirtybees');
             var form = example.querySelector('form');
+			
+			var allowedCardBrand = false;
 
 
             function enableInputs() {
@@ -322,16 +324,29 @@
                 style: style
             });
 
-	    card.on('change', function(event) {
-  		console.log(event);
-		if (event.complete) {
- 		   // enable payment button
- 		 } else if (event.error) {
- 		   // show validation to customer
- 		 }
-}		);
 
-            // Add an instance of the ard Element into the `card-element` <div>
+			card.on('change', function(event) {
+				switch(event.brand){
+					case 'visa':
+					case 'mastercard':
+						allowedCardBrand = true;
+						document.getElementById('error-text-message').innerText = "";
+                        document.getElementById('error-text').style.display = 'none';	
+						break;
+					case 'unknown':
+						allowedCardBrand = false;
+						document.getElementById('error-text-message').innerText = "";
+                        document.getElementById('error-text').style.display = 'none';						
+						break;
+					default:
+					    allowedCardBrand = false;
+						document.getElementById('error-text-message').innerText = "Cette marque de carte de crédit ("+event.brand+") n'est pas prise en charge.";
+                        document.getElementById('error-text').style.display = 'block';
+						break;
+				}
+			});
+
+            // Add an instance of the Card Element into the `card-element` <div>
             card.mount('#thirtybees-stripe-card');
 
             {if !empty($stripe_payment_request) && $stripe_payment_request}
@@ -349,6 +364,7 @@
             });
 
             paymentRequest.on('paymentmethod', function(ev) {
+				
                 stripe.confirmPaymentIntent('{$stripe_client_secret|escape:'javascript'}', {
                     payment_method: ev.paymentMethod.id,
                 }).then(function(confirmResult) {
@@ -400,6 +416,7 @@
 
             form.addEventListener('submit', function (e) {
                 e.preventDefault();
+				if( ! allowedCardBrand ){ console.log("not allowedCardBrand"); return; }
 
                 // Show a loading screen...
                 example.className += ' submitting';
