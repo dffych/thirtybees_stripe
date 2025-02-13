@@ -163,7 +163,7 @@ class StripeValidationModuleFrontController extends ModuleFrontController
             Translate::getModuleTranslation('stripe', 'Stripe: %s', 'validation'),
             $method->getShortName()
         );
-
+        sleep(5);
         $paymentIntent = $api->getPaymentIntent($paymentIntentId);
         if (! $paymentIntent) {
             return $this->displayError(
