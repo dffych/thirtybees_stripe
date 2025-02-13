@@ -114,7 +114,7 @@ class Stripe extends PaymentModule
     {
         $this->name = 'stripe';
         $this->tab = 'payments_gateways';
-        $this->version = '3.9.8';
+        $this->version = '3.9.9';
         $this->author = 'Cybor SA';
         $this->need_instance = 0;
 
@@ -2377,7 +2377,8 @@ class Stripe extends PaymentModule
 	private function reloadStripeApi() {
         $this->api = new StripeApi($this->version);
         $this->methods = new PaymentMethodsRepository($this->getStripeApi());
-		$cache = \Cache::getInstance();
-		$cache->delete('stripe_pmc');
+		if( isset($_SESSION) && isset($_SESSION['stripe_pmc'])){
+			unset($_SESSION['stripe_pmc']);
+		}
 	}
 }

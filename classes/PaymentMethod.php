@@ -126,13 +126,19 @@ abstract class PaymentMethod
     {
 		if(in_array($this->getMethodId(), ['stripe_checkout', 'stripe_cc_form'])) return true;
 
+
+			
 		$cache = \Cache::getInstance();
 
-		if( ! $cache->exists('stripe_pmc')){
+		if( ! isset($_SESSION) || ! isset($_SESSION['stripe_pmc'])  || time() - $_SESSION['stripe_pmc']['created_at'] > 180){
 			$pmcs = $this->getStripeApi()->getPaymentMethodConfigurations();
-			$cache->set('stripe_pmc', $pmcs, 180);
+			$_SESSION['stripe_pmc'] = [
+				'created_at' => time(),
+				'value' => json_encode($pmcs)
+			];
 		}
-		$pmcs = $cache->get('stripe_pmc');
+		$pmcs = json_decode($_SESSION['stripe_pmc']['value'], true);
+
 
         foreach($pmcs['data'] as $pmc){
             if($pmc['active'] == 1 && $pmc['is_default'] == 1){
