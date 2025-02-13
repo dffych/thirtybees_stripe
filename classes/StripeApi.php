@@ -208,7 +208,6 @@ class StripeApi
         return \Stripe\PaymentIntent::create($paymentIntentData);
     }
 
-
     /**
      * @param string $eventId
      *
@@ -306,4 +305,8 @@ class StripeApi
             \Stripe\PaymentIntent::update($paymentIntent->id, $data);
         }
     }
+
+	public function getPaymentMethodConfigurations(){
+		return \Stripe\PaymentMethodConfiguration::all([]);
+	}
 }

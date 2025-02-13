@@ -114,7 +114,7 @@ class Stripe extends PaymentModule
     {
         $this->name = 'stripe';
         $this->tab = 'payments_gateways';
-        $this->version = '3.9.6';
+        $this->version = '3.9.8';
         $this->author = 'Cybor SA';
         $this->need_instance = 0;
 
@@ -337,6 +337,7 @@ class Stripe extends PaymentModule
                 $this->postProcessGeneralOptions();
                 $this->postProcessOrderOptions();
                 $this->postProcessDesignOptions();
+				$this->reloadStripeApi();
             }
         } elseif ($this->menu == static::MENU_TRANSACTIONS) {
             if (Tools::isSubmit('submitBulkdelete' . StripeTransaction::$definition['table'])
@@ -2371,4 +2372,12 @@ class Stripe extends PaymentModule
             'menu' => $menu
         ]);
     }
+
+	// After change options, reload API if keys changed or switch live/test
+	private function reloadStripeApi() {
+        $this->api = new StripeApi($this->version);
+        $this->methods = new PaymentMethodsRepository($this->getStripeApi());
+		$cache = \Cache::getInstance();
+		$cache->delete('stripe_pmc');
+	}
 }

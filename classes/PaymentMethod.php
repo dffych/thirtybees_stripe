@@ -124,15 +124,20 @@ abstract class PaymentMethod
 
     public function checkStripeSideMethodAvailability(): bool
     {
-        $stripe = new \Stripe\StripeClient(Configuration::get(\Stripe::GO_LIVE)
-            ? Configuration::get(\Stripe::SECRET_KEY_LIVE)
-            : Configuration::get(\Stripe::SECRET_KEY_TEST));
+		if(in_array($this->getMethodId(), ['stripe_checkout', 'stripe_cc_form'])) return true;
 
-        $pmcs = $stripe->paymentMethodConfigurations->all([]);
-        foreach($pmcs->data as $pmc){
-            if($pmc->active = 1 && $pmc->is_default = 1){
-                foreach ($pmc->keys() as $key) {
-                    if(is_object($pmc->$key) && get_class($pmc->$key) == "Stripe\StripeObject" && $pmc->$key->available == 1) {
+		$cache = \Cache::getInstance();
+
+		if( ! $cache->exists('stripe_pmc')){
+			$pmcs = $this->getStripeApi()->getPaymentMethodConfigurations();
+			$cache->set('stripe_pmc', $pmcs, 180);
+		}
+		$pmcs = $cache->get('stripe_pmc');
+
+        foreach($pmcs['data'] as $pmc){
+            if($pmc['active'] == 1 && $pmc['is_default'] == 1){
+                foreach ($pmc as $key => $val) {
+                    if($key == $this->getMethodId() && $pmc[$key]['available'] == 1) {
                         return true;
                     }
                 }
