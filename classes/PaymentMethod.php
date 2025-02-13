@@ -65,6 +65,13 @@ abstract class PaymentMethod
             );
         }
 
+        if( ! $this->checkStripeSideMethodAvailability()){
+            $errors[] = sprintf(
+                Tools::displayError('Payment method %s is unavailable on stripe-side. Please check if not activated or ineligible.'),
+                $this->getName()
+            );
+        }
+
         $allowedCurrencies = $this->getAllowedCurrencies();
         if ($allowedCurrencies && !Utils::checkAllowedCurrency($cart, $allowedCurrencies)) {
             $errors[] = sprintf(
@@ -113,6 +120,25 @@ abstract class PaymentMethod
         }
 
         return $errors;
+    }
+
+    public function checkStripeSideMethodAvailability(): bool
+    {
+        $stripe = new \Stripe\StripeClient(Configuration::get(\Stripe::GO_LIVE)
+            ? Configuration::get(\Stripe::SECRET_KEY_LIVE)
+            : Configuration::get(\Stripe::SECRET_KEY_TEST));
+
+        $pmcs = $stripe->paymentMethodConfigurations->all([]);
+        foreach($pmcs->data as $pmc){
+            if($pmc->active = 1 && $pmc->is_default = 1){
+                foreach ($pmc->keys() as $key) {
+                    if(is_object($pmc->$key) && get_class($pmc->$key) == "Stripe\StripeObject" && $pmc->$key->available == 1) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -462,5 +488,8 @@ abstract class PaymentMethod
             return ExecutionResult::error("Stripe responsed with error message");
         }
     }
+
+
+
 
 }

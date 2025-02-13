@@ -1323,6 +1323,9 @@ class Stripe extends PaymentModule
             if ($method->requiresWebhook()) {
                 $notes=  $this->l('Requires webhook');
             }
+            if( ! $method->checkStripeSideMethodAvailability()){
+                $notes=  $this->l('⚠️ Method is unavailable on stripe-side. Please check if not activated or ineligible.');
+            }
             $item = [
                 'position' => $position,
                 'methodId' => $method->getMethodId(),
