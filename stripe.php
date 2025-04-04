@@ -114,7 +114,7 @@ class Stripe extends PaymentModule
     {
         $this->name = 'stripe';
         $this->tab = 'payments_gateways';
-        $this->version = '4.0.0';
+        $this->version = '4.0.1';
         $this->author = 'Cybor SA';
         $this->need_instance = 0;
 
@@ -1324,9 +1324,14 @@ class Stripe extends PaymentModule
             if ($method->requiresWebhook()) {
                 $notes=  $this->l('Requires webhook');
             }
-            if( ! $method->checkStripeSideMethodAvailability()){
-                $notes=  $this->l('⚠️ Method is unavailable on stripe-side. Please check if not activated or ineligible.');
+            try {
+                if (!$method->checkStripeSideMethodAvailability()) {
+                    $notes = $this->l('⚠️ Method is unavailable on stripe-side. Please check if not activated or ineligible.');
+                }
+            }catch (Exception $e) {
+                $notes = $this->l('⚠️ StripeAPI note available. Set API key first.');
             }
+
             $item = [
                 'position' => $position,
                 'methodId' => $method->getMethodId(),
