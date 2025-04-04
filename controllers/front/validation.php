@@ -175,6 +175,7 @@ class StripeValidationModuleFrontController extends ModuleFrontController
 		while($paymentIntent->status == PaymentIntent::STATUS_REQUIRES_ACTION && $tentative < 30){
 			sleep(6);
 			$tentative++;
+			$this->logger->log("Tentative: " . $tentative);
         $paymentIntent = $api->getPaymentIntent($paymentIntentId);
         if (! $paymentIntent) {
             return $this->displayError(
