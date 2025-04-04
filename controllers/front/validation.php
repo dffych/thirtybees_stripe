@@ -1,4 +1,5 @@
 <?php
+	@ini_set('max_execution_time', 600);
 /**
  * Copyright (C) 2017-2024 thirty bees
  *
@@ -163,7 +164,17 @@ class StripeValidationModuleFrontController extends ModuleFrontController
             Translate::getModuleTranslation('stripe', 'Stripe: %s', 'validation'),
             $method->getShortName()
         );
-        sleep(5);
+		$tentative = 0;
+		$paymentIntent = $api->getPaymentIntent($paymentIntentId);
+		if (! $paymentIntent) {
+			return $this->displayError(
+				Tools::displayError("Failed to retrieve payment intent from stripe"),
+				"Failed to retrieve payment intent ".$paymentIntentId
+			);
+		}
+		while($paymentIntent->status == PaymentIntent::STATUS_REQUIRES_ACTION && $tentative < 30){
+			sleep(6);
+			$tentative++;
         $paymentIntent = $api->getPaymentIntent($paymentIntentId);
         if (! $paymentIntent) {
             return $this->displayError(
@@ -171,6 +182,7 @@ class StripeValidationModuleFrontController extends ModuleFrontController
                 "Failed to retrieve payment intent ".$paymentIntentId
             );
         }
+		}
         $this->logger->log("Successfully fetched payment intent data, status = '" . $paymentIntent->status . "'");
         switch ($paymentIntent->status) {
             case PaymentIntent::STATUS_SUCCEEDED:
@@ -187,6 +199,20 @@ class StripeValidationModuleFrontController extends ModuleFrontController
                 return false;
             default:
                 Utils::removeFromCookie($this->context->cookie);
+				Mail::Send(
+					2,
+					'test',
+					Mail::l('Stripe Payment Problem : '.$_GET['type'].' - paymentIntent '.	$_GET['payment_intent']),
+					[],
+					'vincent.barbay@gmail.com',
+					null,
+					null,
+					null,
+					null,
+					null,
+					_PS_MAIL_DIR_,
+					true
+				);	
                 return $this->displayError(
                     sprintf(Tools::displayError('Payment intent has invalid status: %s'), $paymentIntent->status),
                     'Payment intent has invalid status: ' . $paymentIntent
