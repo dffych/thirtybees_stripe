@@ -159,6 +159,22 @@ class StripeHookModuleFrontController extends ModuleFrontController
         /** @var \Stripe\Charge $charge */
         $charge = $event->data['object'];
 
+        if($charge->payment_method_details->type == 'twint') {
+            Mail::Send(
+                2,
+                'test',
+                Mail::l('Stripe Succeeded Twint Payment (check command validation is ok)  : ' . $charge->payment_intent),
+                [],
+                'vincent.barbay@gmail.com',
+                null,
+                null,
+                null,
+                null,
+                null,
+                _PS_MAIL_DIR_,
+                true
+            );
+        }
 
         $chargeId = $charge->id;
         $pendingTransaction = StripeTransaction::findPendingChargeTransaction($charge->id);
