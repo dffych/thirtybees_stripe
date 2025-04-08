@@ -309,7 +309,7 @@ class StripeApi
             }
 
             return [
-                'address' => $address,
+                'address' => serialize($address),
                 'name' =>  $name
             ];
         }  else {
