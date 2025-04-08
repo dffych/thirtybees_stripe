@@ -292,7 +292,7 @@ class StripeApi
     {
         if (\Validate::isLoadedObject($cart)) {
             $name = "";
-            $address = new \stdClass;
+            $address = [];
 
             // pre-fill customer email
             if ($cart->id_customer) {
@@ -302,14 +302,14 @@ class StripeApi
             if($cart->id_address_invoice){
                 $addr = new Address($cart->id_address_invoice);
                 $country = new Country($addr->id_country);
-                $address->line1 = $addr->line1;
-                $address->country = $country->iso_code;
-                $address->city = $addr->city;
-                $address->postal_code = $addr->postcode;
+                $address['line1'] = $addr->address1;
+                $address['country'] = $country->iso_code;
+                $address['city'] = $addr->city;
+                $address['postal_code'] = $addr->postcode;
             }
 
             return [
-                'address' => serialize($address),
+                'address' => $address,
                 'name' =>  $name
             ];
         }  else {
@@ -327,13 +327,17 @@ class StripeApi
     public function addOrderMetadata(PaymentIntent $paymentIntent, array $orders)
     {
         $orderIds = [];
-        $reference = '';
+	$reference = '';
+	$customername = '';
         foreach ($orders as $order) {
             $orderIds[] = (int)$order->id;
-            $reference = $order->reference;
+	    $reference = $order->reference;
+	    $customer = new Customer($order->id_customer);
+	    $customername = $customer->firstname." ". $customer->lastname;
         }
         if ($orderIds && $reference) {
-            $data = [
+	    $data = [
+		'description' => $reference." - ".$customername,
                 'metadata' => [
                     'order_id' => implode(',', $orderIds),
                     'order_reference' => $reference,
