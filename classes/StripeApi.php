@@ -23,6 +23,8 @@ use Configuration;
 use Cart;
 use Context;
 use Customer;
+use Address;
+use Country;
 use Order;
 use PrestaShopException;
 use Stripe\Charge;
@@ -193,6 +195,7 @@ class StripeApi
             'amount' => Utils::getCartTotal($cart),
             'currency' => Utils::getCurrencyCode($cart),
             'metadata' => $this->getCartMetadata($cart),
+            'shipping' => $this->getShippingInfos($cart)
         ];
         if ($returnUrl) {
             $paymentIntentData['confirm'] = true;
@@ -274,6 +277,40 @@ class StripeApi
         if (\Validate::isLoadedObject($cart)) {
             return [
                 'cart_id' => (string)$cart->id,
+            ];
+        }  else {
+            return [];
+        }
+    }
+
+    /**
+     * @param Cart $cart
+     *
+     * @return array
+     */
+    protected function getShippingInfos(Cart $cart): array
+    {
+        if (\Validate::isLoadedObject($cart)) {
+            $name = "";
+            $address = new \stdClass;
+
+            // pre-fill customer email
+            if ($cart->id_customer) {
+                $customer = new Customer($cart->id_customer);
+                $name = $customer->firstname." ". $customer->lastname;
+            }
+            if($cart->id_address_invoice){
+                $addr = new Address($cart->id_address_invoice);
+                $country = new Country($addr->id_country);
+                $address->line1 = $addr->line1;
+                $address->country = $country->iso_code;
+                $address->city = $addr->city;
+                $address->postal_code = $addr->postcode;
+            }
+
+            return [
+                'address' => $address,
+                'name' =>  $name
             ];
         }  else {
             return [];
