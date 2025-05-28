@@ -1,5 +1,4 @@
 <?php
-	@ini_set('max_execution_time', 600);
 /**
  * Copyright (C) 2017-2024 thirty bees
  *
@@ -164,25 +163,13 @@ class StripeValidationModuleFrontController extends ModuleFrontController
             Translate::getModuleTranslation('stripe', 'Stripe: %s', 'validation'),
             $method->getShortName()
         );
-		$tentative = 0;
-		$paymentIntent = $api->getPaymentIntent($paymentIntentId);
-		if (! $paymentIntent) {
-			return $this->displayError(
-				Tools::displayError("Failed to retrieve payment intent from stripe"),
-				"Failed to retrieve payment intent ".$paymentIntentId
-			);
-		}
-		while($paymentIntent->status == PaymentIntent::STATUS_REQUIRES_ACTION && $tentative < 30){
-			sleep(6);
-			$tentative++;
-			$this->logger->log("Tentative: " . $tentative);
+
         $paymentIntent = $api->getPaymentIntent($paymentIntentId);
         if (! $paymentIntent) {
             return $this->displayError(
                 Tools::displayError("Failed to retrieve payment intent from stripe"),
                 "Failed to retrieve payment intent ".$paymentIntentId
             );
-        }
 		}
         $this->logger->log("Successfully fetched payment intent data, status = '" . $paymentIntent->status . "'");
         switch ($paymentIntent->status) {
@@ -192,6 +179,11 @@ class StripeValidationModuleFrontController extends ModuleFrontController
                 $this->logger->log('Processing payment');
                 $this->processPayment($cart, $paymentIntent, $methodId, $methodName);
                 return true;
+	    case PaymentIntent::STATUS_REQUIRES_ACTION:
+	    	return $this->displayInformation(
+                    Tools::displayError('Payment is delayed for a few seconds. The order will appear in your account within a few minutes.'),
+                    'Payment is delayed for a few seconds. The order will appear in your account within a few minutes.'
+                );
             case PaymentIntent::STATUS_CANCELED:
             case PaymentIntent::STATUS_REQUIRES_PAYMENT_METHOD:
                 $this->logger->log("Payment canceled, cleaning data from cookie");
@@ -200,20 +192,6 @@ class StripeValidationModuleFrontController extends ModuleFrontController
                 return false;
             default:
                 Utils::removeFromCookie($this->context->cookie);
-				Mail::Send(
-					2,
-					'test',
-					Mail::l('Stripe Payment Problem : '.$_GET['type'].' - paymentIntent '.	$_GET['payment_intent']),
-					[],
-					'vincent.barbay@gmail.com',
-					null,
-					null,
-					null,
-					null,
-					null,
-					_PS_MAIL_DIR_,
-					true
-				);	
                 return $this->displayError(
                     sprintf(Tools::displayError('Payment intent has invalid status: %s'), $paymentIntent->status),
                     'Payment intent has invalid status: ' . $paymentIntent
@@ -283,6 +261,7 @@ class StripeValidationModuleFrontController extends ModuleFrontController
         return false;
     }
 
+
     /**
      * @param StripeApi $api
      * @param PaymentMetadata $metadata
@@ -302,4 +281,21 @@ class StripeValidationModuleFrontController extends ModuleFrontController
         }
         return null;
     }
+    
+        
+    private function displayInformations($errors)
+    {
+        $this->context->smarty->assign('orderLink', '/index.php?controller=my-account');
+        $this->errors = $errors;
+        $this->setTemplate('information.tpl');
+        return false;
+    }
+    
+        private function displayInformation(string $display, string $log)
+    {
+        $this->logger->log($log);
+        return $this->displayInformations([ $display ]);
+    }
+    
+    
 }

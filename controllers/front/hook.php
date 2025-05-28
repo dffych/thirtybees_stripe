@@ -24,6 +24,12 @@ use StripeModule\Utils;
 use StripeModule\Logger\Logger;
 use StripeModule\Logger\FileLogger;
 
+use StripeModule\PaymentMetadata;
+use StripeModule\PaymentMethod;
+use StripeModule\StripeApi;
+use StripeModule\PaymentProcessor;
+use Stripe\PaymentIntent;
+
 if (!defined('_TB_VERSION_')) {
     exit;
 }
@@ -159,61 +165,156 @@ class StripeHookModuleFrontController extends ModuleFrontController
         /** @var \Stripe\Charge $charge */
         $charge = $event->data['object'];
 
-        if($charge->payment_method_details->type == 'twint') {
-            Mail::Send(
-                2,
-                'test',
-                Mail::l('Stripe Succeeded Twint Payment (check command validation is ok)  : ' . $charge->payment_intent),
-                [],
-                'vincent.barbay@gmail.com',
-                null,
-                null,
-                null,
-                null,
-                null,
-                _PS_MAIL_DIR_,
-                true
+        if($charge->payment_method_details->type == 'twint') {	
+			Mail::Send(
+				2,
+				'test',
+				Mail::l('Stripe Succeeded Twint Payment (check command validation is ok)  : ' . $charge->payment_intent),
+				[],
+				'vincent.barbay@gmail.com',
+				null,
+				null,
+				null,
+				null,
+				null,
+				_PS_MAIL_DIR_,
+				true
+			);
+
+
+			$api = $this->module->getStripeApi();
+			$methodId = $charge->payment_method_details->type;
+			$this->logger->log('Payment method id: ' . $methodId);
+			$repository = $this->module->getPaymentMethodsRepository();
+			$method = $repository->getMethod($methodId);
+			if ($method) {
+				$this->logger->log("Payment method: " . $method->getShortName());
+				$cart = new Cart((int) $charge->metadata->cart_id);
+				$pi = $api->getPaymentIntent($charge->payment_intent);
+				$metadata = PaymentMetadata::createForPaymentIntent($charge->payment_method_details->type, $cart, $pi);
+				if ($metadata) {
+					$this->logger->log("Received payment metadata: " . json_encode($metadata->getData()));
+					return $this->validatePaymentMethod($method, $metadata);
+				} else {
+					return $this->displayError(
+						Tools::displayError('Payment metadata not found'),
+						'Payment metadata not found'
+					);
+				}
+			} else {
+				return $this->displayError(
+					sprintf(Tools::displayError('Payment method %s is not available'), $methodId),
+					sprintf('Payment method %s is not available', $methodId)
+				);
+			}
+        } else {
+
+			$chargeId = $charge->id;
+			$pendingTransaction = StripeTransaction::findPendingChargeTransaction($charge->id);
+			if (! $pendingTransaction) {
+				return 'No pending transaction for charge id ' . $chargeId;
+			}
+
+			$idOrder = (int)$pendingTransaction['id_order'];
+			if (! $idOrder) {
+				return 'No order found for pending charge id ' . $chargeId;
+			}
+
+			$order = new Order($idOrder);
+			if (! Validate::isLoadedObject($order)) {
+				$this->logger->error("Order with id $idOrder not found");
+				return "Order with id $idOrder not found";
+			}
+			$totalAmount = $order->getTotalPaid();
+
+			$transaction = new StripeTransaction();
+			$transaction->card_last_digits = 0;
+			$transaction->id_charge = $charge->id;
+			$transaction->amount = $totalAmount;
+			$transaction->id_order = $order->id;
+			$transaction->type = StripeTransaction::TYPE_CHARGE;
+			$transaction->source = StripeTransaction::SOURCE_WEBHOOK;
+			$transaction->source_type = $pendingTransaction['source_type'];
+			$transaction->add();
+
+			$status = (int)Configuration::get(Stripe::STATUS_VALIDATED);
+			$orderHistory = new OrderHistory();
+			$orderHistory->id_order = $order->id;
+			$orderHistory->changeIdOrderState($status, $idOrder);
+			$orderHistory->addWithemail(true);
+
+			$this->logger->log("Setting status for order id $idOrder to $status");
+			return 'Order id ' . $idOrder . ' validated';
+		}
+    }
+	
+
+    public function validatePaymentMethod(PaymentMethod $method, PaymentMetadata $metadata)
+    {
+        $api = $this->module->getStripeApi();
+        $cart = new Cart((int) $metadata->getCartId());
+
+        if (! Validate::isLoadedObject($cart)) {
+            return $this->displayError(
+                Tools::displayError('Cart not found'),
+                'Cart not found in current session'
             );
         }
 
-        $chargeId = $charge->id;
-        $pendingTransaction = StripeTransaction::findPendingChargeTransaction($charge->id);
-        if (! $pendingTransaction) {
-            return 'No pending transaction for charge id ' . $chargeId;
+        $paymentIntentId = $this->getPaymentIntentId($api, $metadata);
+        if (! $paymentIntentId) {
+            $this->logger->error("Failed to resolve payment intent");
+            $this->redirectToCheckout();
+            return false;
+        } else {
+            $this->logger->log("Payment intent id: " . $paymentIntentId);
         }
 
-        $idOrder = (int)$pendingTransaction['id_order'];
-        if (! $idOrder) {
-            return 'No order found for pending charge id ' . $chargeId;
+        // Optional check for provided payment intent
+        $providedPaymentIntentId = Tools::getValue('payment_intent');
+        if ($providedPaymentIntentId) {
+            if ($paymentIntentId !== $providedPaymentIntentId) {
+                return $this->displayError(
+                    Tools::displayError('Invalid parameter payment_intent'),
+                    'Invalid parameter payment_intent'
+                );
+            }
         }
 
-        $order = new Order($idOrder);
-        if (! Validate::isLoadedObject($order)) {
-            $this->logger->error("Order with id $idOrder not found");
-            return "Order with id $idOrder not found";
+        $errors = $metadata->validate($method, $cart);
+        if ($errors) {
+            $this->logger->error("Failed to validate metadata: " . implode(", ", $errors));
+            return $this->displayErrors($errors);
         }
-        $totalAmount = $order->getTotalPaid();
 
-        $transaction = new StripeTransaction();
-        $transaction->card_last_digits = 0;
-        $transaction->id_charge = $charge->id;
-        $transaction->amount = $totalAmount;
-        $transaction->id_order = $order->id;
-        $transaction->type = StripeTransaction::TYPE_CHARGE;
-        $transaction->source = StripeTransaction::SOURCE_WEBHOOK;
-        $transaction->source_type = $pendingTransaction['source_type'];
-        $transaction->add();
+        $methodId = $method->getMethodId();
+        $methodName = sprintf(
+            Translate::getModuleTranslation('stripe', 'Stripe: %s', 'validation'),
+            $method->getShortName()
+        );
 
-        $status = (int)Configuration::get(Stripe::STATUS_VALIDATED);
-        $orderHistory = new OrderHistory();
-        $orderHistory->id_order = $order->id;
-        $orderHistory->changeIdOrderState($status, $idOrder);
-        $orderHistory->addWithemail(true);
+        $paymentIntent = $api->getPaymentIntent($paymentIntentId);
+        if (! $paymentIntent) {
+            return $this->displayError(
+                Tools::displayError("Failed to retrieve payment intent from stripe"),
+                "Failed to retrieve payment intent ".$paymentIntentId
+            );
+	}
 
-        $this->logger->log("Setting status for order id $idOrder to $status");
-        return 'Order id ' . $idOrder . ' validated';
+        $this->logger->log("Successfully fetched payment intent data, status = '" . $paymentIntent->status . "'");
+        switch ($paymentIntent->status) {
+            case PaymentIntent::STATUS_SUCCEEDED:
+                $this->logger->log('Processing payment');
+                return $this->processPayment($cart, $paymentIntent, $methodId, $methodName);
+            default:
+                Utils::removeFromCookie($this->context->cookie);	
+                return $this->displayError(
+                    sprintf(Tools::displayError('Payment intent has invalid status: %s'), $paymentIntent->status),
+                    'Payment intent has invalid status: ' . $paymentIntent
+                );
+        }
     }
-
+	
     /**
      * Process `charge.failed` event
      *
@@ -462,5 +563,45 @@ class StripeHookModuleFrontController extends ModuleFrontController
     {
         $api = $this->module->getStripeApi();
         return $api->getEvent($eventId);
+    }
+
+    private function processPayment(Cart $cart, PaymentIntent $paymentIntent, string $methodId, string $paymentMethodName)
+    {
+        $processor = new PaymentProcessor($this->module, $this->logger);
+        if ($processor->processPayment($cart, $paymentIntent, $methodId, $paymentMethodName)) {
+            $this->logger->log("Payment sucessfully processed");
+            return "Payment sucessfully processed";
+        } else {
+            $this->logger->log("Payment failed");
+            return join("\n",$processor->getErrors());
+        }
+    }
+
+    private function displayError(string $display, string $log)
+    {
+        $this->logger->error($log);
+        return $this->displayErrors([ $display ]);
+    }
+
+    private function displayErrors($errors)
+    {
+        $orderProcess = Configuration::get('PS_ORDER_PROCESS_TYPE') ? 'order-opc' : 'order';
+        $this->context->smarty->assign('orderLink', $this->context->link->getPageLink($orderProcess, true));
+        $this->errors = $errors;
+        $this->setTemplate('error.tpl');
+        return false;
+    }
+
+    private function getPaymentIntentId(StripeApi $api, PaymentMetadata $metadata)
+    {
+        switch ($metadata->getType()) {
+            case PaymentMetadata::TYPE_PAYMENT_INTENT:
+                return $metadata->getId();
+            case PaymentMetadata::TYPE_SESSION:
+                $sessionId = $metadata->getId();
+                $session = $api->getCheckoutSession($sessionId);
+                return $session->payment_intent;
+        }
+        return null;
     }
 }
