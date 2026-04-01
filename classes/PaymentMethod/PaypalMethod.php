@@ -22,16 +22,19 @@ class PaypalMethod extends PaymentMethod
         return static::METHOD_ID;
     }
 
+
     /**
      * @return string[]
      */
     protected function getAllowedCurrencies(): array
     {
-        return ['CHF'];
+        return [
+            'EUR', 'CHF'
+        ];
     }
 
     /**
-     * @return array|string[]
+     * @return string[]
      */
     protected function getAllowedAccountCountries(): array
     {
@@ -43,7 +46,8 @@ class PaypalMethod extends PaymentMethod
      */
     protected function getAllowedCustomerCountries(): array
     {
-        return ['CH'];
+         return static::ALL;
+
     }
 
     /**

@@ -18,7 +18,7 @@
 {strip}
 <p class="payment_module stripe_payment_button">
     <a id="stripe_{$id}_payment_link" href="{$paymentLink|escape:'htmlall'}" title="{$cta|escape:'htmlall'}">
-        <img src="{$img}" alt="{$cta|escape:'htmlall'}" width="auto" height="64" />&nbsp;
+        <img src="{$img}" alt="{$cta|escape:'htmlall'}" style="height:auto;width:86px;margin-right:20px;" />
         {$cta|escape:'html'}
     </a>
 </p>

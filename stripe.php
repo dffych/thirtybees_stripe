@@ -114,7 +114,7 @@ class Stripe extends PaymentModule
     {
         $this->name = 'stripe';
         $this->tab = 'payments_gateways';
-        $this->version = '4.0.7';
+        $this->version = '4.1.0';
         $this->author = 'Cybor SA';
         $this->need_instance = 0;
 
@@ -2386,4 +2386,61 @@ class Stripe extends PaymentModule
 			unset($_SESSION['stripe_pmc']);
 		}
 	}
+	
+	
+    public function validateOrder(
+        $idCart,
+        $idOrderState,
+        $amountPaid,
+        $paymentMethod = 'Unknown',
+        $message = null,
+        $extraVars = [],
+        $currencySpecial = null,
+        $dontTouchAmount = false,
+        $secureKey = false,
+        Shop $shop = null
+    ) {
+		$logger = new FileLogger();
+		
+		$lock_key = 'stripe_validate_order_' . (int) $idCart;
+
+		// Tenter d'obtenir le verrou MySQL pendant 10 secondes max
+		$result = Db::getInstance()->getValue("SELECT GET_LOCK('$lock_key', 10)");
+
+		if ((int)$result !== 1) {
+			$logger->error("Stripe: verrou non obtenu pour le panier $idCart");
+			return false; // Ou lance une exception si tu veux bloquer fort
+		}
+
+		try {
+			// Vérifie qu’aucune commande n’existe déjà pour ce panier
+			if (Order::getOrderByCartId((int) $idCart)) {
+				$logger->error("Stripe: commande déjà existante pour le panier $idCart");
+				return false;
+			}
+
+			// Appel normal de la méthode parente
+			return parent::validateOrder(
+			        $idCart,
+			        $idOrderState,
+			        $amountPaid,
+			        $paymentMethod,
+				$message,
+			        $extraVars,
+			        $currencySpecial,
+			        $dontTouchAmount,
+			        $secureKey,
+				$shop
+
+			);
+		} catch (Exception $e) {
+			$logger->error("Stripe: exception lors de validateOrder pour le panier $idCart - " . $e->getMessage());
+			throw $e;
+		} finally {
+			// Libère le verrou MySQL
+			Db::getInstance()->getValue("SELECT RELEASE_LOCK('$lock_key')");
+		}
+	}
+
+	
 }
